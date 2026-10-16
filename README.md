@@ -2,7 +2,7 @@
 
 > Nền tảng phân tích dữ liệu thương mại điện tử hiện đại: Kết hợp trực quan hóa số liệu trực quan (Interactive BI), mô hình học máy dự báo rủi ro (Predictive ML), tác tử thông minh (AI Agent / Text-to-SQL) và quy trình tự động hóa kiểm thử liên tục (CI/CD).
 
-[![CI/CD Pipeline](https://github.com/pttlinh32/ecommerce-ai-analytics/actions/workflows/ci.yml/badge.svg)](https://github.com/pttlinh32/ecommerce-ai-analytics/actions)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/pttlinh32/ecommerce-ai-analytics)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35%2B-FF4B4B.svg)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-AI%20Agent-green.svg)](https://www.langchain.com/)
