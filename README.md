@@ -1,10 +1,3 @@
-Dưới đây là toàn bộ nội dung file **`README.md`** hoàn chỉnh, đã được cập nhật đầy đủ link repository của bạn (`pttlinh32/ecommerce-ai-analytics`), tích hợp **CI/CD (GitHub Actions)** và **AI Agent (LangChain / Tool Calling)**.
-
-Bạn chỉ cần mở file `README.md` trong VS Code, xóa nội dung cũ (nếu có) và dán toàn bộ đoạn mã dưới đây vào:
-
----
-
-```markdown
 # 🛍️ AI-Powered E-Commerce Analytics & Conversational Agent
 
 > Nền tảng phân tích dữ liệu thương mại điện tử hiện đại: Kết hợp trực quan hóa số liệu trực quan (Interactive BI), mô hình học máy dự báo rủi ro (Predictive ML), tác tử thông minh (AI Agent / Text-to-SQL) và quy trình tự động hóa kiểm thử liên tục (CI/CD).
