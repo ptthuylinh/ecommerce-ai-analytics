@@ -9,6 +9,8 @@
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-F7931E.svg)](https://scikit-learn.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+🌐 **Trải nghiệm ứng dụng trực tiếp tại:** [https://ecommerce-ai-analytics.streamlit.app/](https://ecommerce-ai-analytics.streamlit.app/)
+
 ---
 
 ## 📌 1. Bài toán & Mục tiêu dự án (Problem Statement)
