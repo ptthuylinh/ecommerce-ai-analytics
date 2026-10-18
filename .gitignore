@@ -219,10 +219,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Bỏ qua dữ liệu lớn
+# # Bỏ qua dữ liệu lớn
 data/raw/*
 data/processed/*
-data/*.db
+
 
 # Bỏ qua mô hình nặng
 models/*.pkl
