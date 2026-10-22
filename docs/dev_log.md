@@ -6,10 +6,31 @@ Mục tiêu là phản ánh trung thực, khách quan diễn biến phát triể
 ---
 
 ## 📑 Mục lục
+- [2026-10-23: Thiết kế lại dashboard (v1 -> v2)](#2026-10-23-thiết-kế-lại-dashboard-v1---v2)
 - [[Ngày]: Viết lại truy vấn KPI (điền sau khi làm xong)](#ngày-viết-lại-truy-vấn-kpi-điền-sau-khi-làm-xong)
 - [2026-10-22: Thử tối ưu get_kpi_metrics bằng index](#2026-10-22-thử-tối-ưu-get_kpi_metrics-bằng-index)
 - [2026-10-22: Thiết lập CI và kiểm thử](#2026-10-22-thiết-lập-ci-và-kiểm-thử)
 - [💡 Bài học chung](#-bài-học-chung)
+
+---
+
+## 2026-10-23: Thiết kế lại dashboard (v1 -> v2)
+
+* **Ngày:** 2026-10-23
+* **Bối cảnh:** Phiên bản v1 chỉ có 4 thẻ KPI tĩnh và 2 biểu đồ, không có mốc so sánh, không chỉ ra được nguyên nhân và vấn đề cốt lõi nên ít mang lại giá trị thực tế cho người ra quyết định.
+* **Vấn đề đã xác định:**
+  1. KPI không có mốc so sánh (không biết tăng hay giảm, tốt hay xấu).
+  2. Dữ liệu sàn Olist bị thưa thớt ở giai đoạn cuối năm 2016 và cuối năm 2018, dẫn đến biểu đồ xu hướng doanh thu bị sụt giảm giả tạo và gây hiểu nhầm.
+  3. Thiếu góc nhìn vận hành quan trọng (độ trễ giao hàng, trải nghiệm đánh giá, phân bổ thanh toán và khách hàng).
+* **Quyết định:**
+  * Chia lại cấu trúc Dashboard thành 4 tabs chuyên sâu (*Tổng quan, Giao hàng & Trải nghiệm, Sản phẩm, Khách hàng & Khu vực*).
+  * Mặc định lọc khoảng thời gian chuẩn từ `2017-01-01` đến `2018-08-31` kèm ghi chú giải thích.
+  * Bổ sung chỉ số delta so với kỳ liền trước cho các thẻ KPI.
+  * Bổ sung biểu đồ phân tích tương quan điểm đánh giá theo từng mức độ trễ giao hàng.
+* **Kết quả:** [điền: ảnh trước/sau, số lượng biểu đồ, thời gian tải trang trước/sau khi dùng cache].
+* **Phát hiện từ dữ liệu:** [điền sau khi chạy: ví dụ điểm đánh giá TB khi giao trễ so với giao đúng hạn là bao nhiêu].
+* **Bài học:** Dashboard không chỉ để trưng bày số liệu mà cần trả lời rõ 3 câu hỏi cho người quản trị: "Đang tốt hay xấu, vấn đề nằm ở đâu, và cần hành động gì?".
+* **Liên hệ tiếp theo:** Các phát hiện và số liệu định lượng về rủi ro giao hàng trễ hạn chính là tiền đề và động lực cốt lõi để xây dựng mô hình AI dự báo ở Giai đoạn 3.
 
 ---
 
