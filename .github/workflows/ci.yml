@@ -1,0 +1,39 @@
+name: CI Pipeline
+
+# Tự động kích hoạt khi có push hoặc pull request vào develop và main
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. Checkout mã nguồn
+      uses: actions/checkout@v4
+
+    - name: 2. Thiết lập môi trường Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+
+    - name: 3. Cài đặt các thư viện phụ thuộc
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        pip install -r requirements.txt
+
+    - name: 4. Kiểm tra lỗi cú pháp (Linting)
+      run: |
+        # Dừng luồng nếu có lỗi cú pháp Python hoặc tên biến chưa khai báo
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Cảnh báo các lỗi nhỏ về khoảng trắng (không làm dừng build)
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: 5. Chạy kiểm thử tự động với Pytest
+      run: |
+        pytest
