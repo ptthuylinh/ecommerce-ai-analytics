@@ -6,11 +6,32 @@ Mục tiêu là phản ánh trung thực, khách quan diễn biến phát triể
 ---
 
 ## 📑 Mục lục
+- [2026-10-23: Tối ưu tốc độ dashboard (10 truy vấn JOIN -> bảng phẳng + pandas)](#2026-10-23-tối-ưu-tốc-độ-dashboard-10-truy-vấn-join---bảng-phẳng--pandas)
 - [2026-10-23: Thiết kế lại dashboard (v1 -> v2)](#2026-10-23-thiết-kế-lại-dashboard-v1---v2)
 - [[Ngày]: Viết lại truy vấn KPI (điền sau khi làm xong)](#ngày-viết-lại-truy-vấn-kpi-điền-sau-khi-làm-xong)
 - [2026-10-22: Thử tối ưu get_kpi_metrics bằng index](#2026-10-22-thử-tối-ưu-get_kpi_metrics-bằng-index)
 - [2026-10-22: Thiết lập CI và kiểm thử](#2026-10-22-thiết-lập-ci-và-kiểm-thử)
 - [💡 Bài học chung](#-bài-học-chung)
+
+---
+
+## 2026-10-23: Tối ưu tốc độ dashboard (10 truy vấn JOIN -> bảng phẳng + pandas)
+- Bối cảnh: mỗi lần mở trang hoặc đổi bộ lọc, dashboard chạy 10 truy vấn JOIN trên SQLite, tổng ~40,8s. @st.cache_data chỉ giúp khi lặp lại đúng bộ lọc cũ.
+- Giả thuyết đã loại: thêm index (mục 2026-10-22, không cải thiện: 4,74s -> 5,08s).
+- Chẩn đoán (bộ lọc 2017-01-01..2018-08-31, status delivered): hàm chậm nhất là kpi_extended 7,18s; delay_vs_review 4,77s; review_distribution 4,88s; revenue_by_state 4,86s; payment_mix 4,30s.
+- Giải pháp: nạp 2 bảng phẳng một lần (orders_fact 99.441 dòng, items_fact 112.650 dòng), gộp payments/reviews theo order_id, lọc và group-by bằng pandas (src/analytics.py). Giữ nguyên src/db.py làm "đáp án chuẩn".
+- Kiểm chứng: 21 test đối chiếu analytics vs SQL (7 hàm x 3 bộ lọc) + 3 test trên DB thật, tổng 24/24 pass. Chưa phủ: kpi_previous_period, review_distribution, payment_mix.
+- Kết quả:
+
+| Tình huống | Trước | Sau |
+|---|---|---|
+| Nạp dữ liệu lần đầu (1 lần) | không có | 14,76 s |
+| Mỗi lần đổi bộ lọc (lọc + 10 hàm) | 40,77 s | 0,586 s |
+| Tăng tốc | | 69,5x |
+
+- Đánh đổi: tốn RAM giữ DataFrame; dữ liệu nạp một lần nên không tự cập nhật khi DB đổi; lần khởi động đầu vẫn ~15s.
+- Hướng tiếp: lưu bảng phẳng ra parquet để giảm thời gian nạp đầu.
+- Bài học: đo trước khi tối ưu (index không giúp, tính lại mỗi lần mới là nút thắt); với dữ liệu ~100k dòng thì tính một lần rồi lọc trong bộ nhớ là phù hợp; luôn có test đối chiếu khi viết lại logic.
 
 ---
 
