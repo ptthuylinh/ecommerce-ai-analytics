@@ -68,10 +68,19 @@ def inject_css():
     """Chèn CSS tùy biến: Google Fonts, Bento containers, ẩn header/footer, giảm padding."""
     t = TOKENS
     css = f"""<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
-html, body, p, label, button, input, textarea, li,
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+html, body, p, label, input, textarea, li,
 [data-testid="stMarkdownContainer"], [data-testid="stMetric"] {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }}
-[data-testid="stIconMaterial"], span[class*="material"], .material-symbols-rounded {{ font-family: 'Material Symbols Rounded', 'Material Symbols Outlined' !important; }}
+[data-testid="stIconMaterial"], .material-symbols-rounded, .material-symbols-outlined, [class*="material-symbols"], [data-testid*="Icon"] {{
+    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined' !important;
+    font-weight: normal;
+    font-style: normal;
+    display: inline-block;
+    white-space: nowrap;
+    text-transform: none;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'liga';
+}}
 h1, h2, h3, h4, h5, h6 {{ font-family: 'Plus Jakarta Sans', sans-serif !important; font-weight: 700 !important; letter-spacing: -0.02em; color: {t['text']} !important; }}
 header[data-testid="stHeader"] {{ background: transparent !important; }}
 footer, #MainMenu, [data-testid="stToolbar"], [data-testid="stDeployButton"] {{ visibility: hidden !important; }}

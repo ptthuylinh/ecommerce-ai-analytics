@@ -139,3 +139,40 @@ def test_top_categories_vs_sql(loaded_facts, filters):
     pan_cat = an.top_categories(df_if, 10)
 
     assert_frame_equal(sql_cat, pan_cat, check_dtype=False, check_exact=False, rtol=1e-3, atol=1e-2)
+
+
+@pytest.mark.parametrize("filters", FILTERS_CASES)
+def test_kpi_previous_period_vs_sql(loaded_facts, filters):
+    orders_fact, _ = loaded_facts
+
+    sql_kpi_prev = db.get_kpi_previous_period(filters)
+    pan_kpi_prev = an.kpi_previous_period(orders_fact, filters, db_path=REAL_DB_PATH)
+
+    assert_series_equal(sql_kpi_prev, pan_kpi_prev, check_dtype=False, check_exact=False, rtol=1e-3, atol=1e-2)
+
+
+@pytest.mark.parametrize("filters", FILTERS_CASES)
+def test_review_distribution_vs_sql(loaded_facts, filters):
+    orders_fact, _ = loaded_facts
+    df_f = an.apply_filters(orders_fact, filters, db_path=REAL_DB_PATH)
+
+    sql_rev = db.get_review_distribution(filters)
+    pan_rev = an.review_distribution(df_f)
+
+    # Chênh lệch < 1.5% do orders_fact gộp review theo đơn (AVG) tránh fan-out
+    assert_frame_equal(sql_rev, pan_rev, check_dtype=False, check_exact=False, rtol=0.02, atol=100)
+
+
+@pytest.mark.parametrize("filters", FILTERS_CASES)
+def test_payment_mix_vs_sql(loaded_facts, filters):
+    orders_fact, _ = loaded_facts
+    df_f = an.apply_filters(orders_fact, filters, db_path=REAL_DB_PATH)
+
+    sql_pay = db.get_payment_mix(filters)
+    pan_pay = an.payment_mix(df_f)
+
+    # Thứ tự phương thức thanh toán phải khớp
+    assert list(sql_pay["payment_type"]) == list(pan_pay["payment_type"])
+    # Tỷ lệ percentage khớp trong khoảng 0.5%
+    np.testing.assert_allclose(sql_pay["percentage"].values, pan_pay["percentage"].values, atol=0.5)
+

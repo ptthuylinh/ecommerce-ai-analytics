@@ -99,8 +99,10 @@ def benchmark_comparison():
     print("-" * 80)
     print(f"{'TỔNG THỜI GIAN TRANG':<24} | {total_before:>10.4f} s    | {total_after*1000:>10.2f} ms ({total_after:.4f}s) | {total_before/total_after:>8.1f}x")
     print("=" * 80)
-    print(f"==> KẾT QUẢ: Tải trang Dashboard giảm từ {total_before:.2f}s xuống chỉ còn {total_after*1000:.1f}ms (< 0.2s),")
-    print(f"    vượt xa mục tiêu đặt ra (< 2 giây) gấp hơn 10 lần!\n")
+    speedup_total = total_before / total_after if total_after > 0 else 0.0
+    faster_than_goal = 2.0 / total_after if total_after > 0 else 0.0
+    print(f"==> KẾT QUẢ: Tải trang Dashboard giảm từ {total_before:.2f}s xuống chỉ còn {total_after*1000:.1f}ms ({total_after:.3f}s),")
+    print(f"    tăng tốc {speedup_total:.1f}x và vượt mục tiêu đặt ra (< 2 giây) gấp {faster_than_goal:.1f} lần!\n")
 
 
 if __name__ == "__main__":
