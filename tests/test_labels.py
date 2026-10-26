@@ -60,12 +60,12 @@ def test_category_label_known():
 def test_category_label_fallback():
     """
     Kiểm tra fallback của category_label:
-    Khi gặp mã danh mục chưa có trong từ điển tiếng Việt, tự động replace('_', ' ').title().
+    Khi gặp mã danh mục chưa có trong từ điển tiếng Việt, hiển thị 'Khác (<mã>)'.
     Khi gặp mã rỗng hoặc None, hiển thị 'Chưa phân loại'.
     """
-    assert category_label("unknown_category") == "Unknown Category"
-    assert category_label("fashion_special_accessories") == "Fashion Special Accessories"
-    assert category_label("my_new_product") == "My New Product"
+    assert category_label("unknown_category") == "Khác (unknown_category)"
+    assert category_label("fashion_special_accessories") == "Khác (fashion_special_accessories)"
+    assert category_label("my_new_product") == "Khác (my_new_product)"
     assert category_label("") == "Chưa phân loại"
     assert category_label(None) == "Chưa phân loại"
     assert category_label("nan") == "Chưa phân loại"
@@ -83,7 +83,7 @@ def test_portuguese_category_fallback_or_mapping():
     """Kiểm tra category_label xử lý an toàn khi truyền mã gốc tiếng Bồ Đào Nha."""
     assert category_label("beleza_saude") == "Sức khỏe & Làm đẹp"
     res = category_label("categoria_desconhecida")
-    assert res == "Categoria Desconhecida"
+    assert res == "Khác (categoria_desconhecida)"
 
 
 # ==============================================================================
@@ -194,8 +194,10 @@ def test_check_prev_period_valid():
 @pytest.mark.integration
 def test_all_db_categories_translated():
     """
-    Test tích hợp: Mọi danh mục DISTINCT trong CSDL ecommerce.db đều có trong CATEGORY_VI
-    và hàm category_label(x) không chứa bất kỳ dấu gạch dưới nào.
+    Test tích hợp: Mọi danh mục DISTINCT trong CSDL ecommerce.db (cả cột tiếng Anh
+    lẫn cột gốc tiếng Bồ Đào Nha thực sự dùng làm giá trị lọc) đều có trong CATEGORY_VI,
+    nếu thiếu sẽ fail và liệt kê rõ các mã còn thiếu.
+    Hàm category_label(x) không chứa bất kỳ dấu gạch dưới nào và không rơi vào fallback 'Khác (...)'.
     """
     import os
     import sqlite3
@@ -206,25 +208,41 @@ def test_all_db_categories_translated():
 
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT DISTINCT product_category_name_english FROM products WHERE product_category_name_english IS NOT NULL"
-    )
-    db_cats = [r[0] for r in cur.fetchall() if r[0]]
+    # 1. Lấy DISTINCT mọi mã danh mục từ cả 2 cột (cột tiếng Anh và cột gốc tiếng Bồ Đào Nha)
+    cur.execute("""
+        SELECT DISTINCT product_category_name_english
+        FROM products
+        WHERE product_category_name_english IS NOT NULL AND product_category_name_english != ''
+    """)
+    en_cats = {r[0] for r in cur.fetchall() if r[0]}
+
+    cur.execute("""
+        SELECT DISTINCT product_category_name
+        FROM products
+        WHERE product_category_name IS NOT NULL AND product_category_name != ''
+    """)
+    pt_cats = {r[0] for r in cur.fetchall() if r[0]}
     conn.close()
 
-    assert len(db_cats) > 0, "Không có danh mục nào trong CSDL"
+    all_db_cats = sorted(en_cats.union(pt_cats))
+    assert len(all_db_cats) > 0, "Không có danh mục nào trong CSDL"
 
-    # 1. Mọi danh mục trong DB đều có trong CATEGORY_VI
-    missing = [c for c in db_cats if c not in CATEGORY_VI]
-    assert not missing, f"Các danh mục trong DB chưa có trong CATEGORY_VI: {missing}"
+    # 2. Mọi mã trong DB đều có trong CATEGORY_VI (test fail liệt kê mã thiếu)
+    missing = [c for c in all_db_cats if c not in CATEGORY_VI]
+    assert not missing, f"Các mã danh mục trong DB còn thiếu trong CATEGORY_VI ({len(missing)} mã): {missing}"
 
-    # 2. category_label(x) không chứa dấu gạch dưới
-    for c in db_cats:
+    # 3. category_label(x) không chứa dấu gạch dưới và không bị rơi vào fallback "Khác (<mã>)"
+    for c in all_db_cats:
         label = category_label(c)
         assert "_" not in label, f"Nhãn vẫn chứa dấu gạch dưới: {c} -> {label}"
+        assert not label.startswith("Khác ("), f"Nhãn bị rơi vào fallback: {c} -> {label}"
         assert label != "Chưa phân loại", f"Danh mục hợp lệ không được là 'Chưa phân loại': {c}"
 
-    # 3. Giá trị rỗng và None trả về 'Chưa phân loại'
+    # 4. Giá trị rỗng và None trả về 'Chưa phân loại'
     assert category_label(None) == "Chưa phân loại"
     assert category_label("") == "Chưa phân loại"
+    assert category_label("nan") == "Chưa phân loại"
+
+    # 5. Mã không tồn tại trong từ điển phải rơi vào fallback "Khác (<mã>)"
+    assert category_label("ma_chua_dich_xyz") == "Khác (ma_chua_dich_xyz)"
 
