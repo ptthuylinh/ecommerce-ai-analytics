@@ -5,14 +5,21 @@ Module giao diện Sidebar chứa các bộ lọc đa chiều cho Dashboard.
 import datetime
 import streamlit as st
 from src.db import get_filter_options
+from src.ui.labels import (
+    state_label,
+    category_label,
+    STATE_ORDER,
+    CATEGORY_ORDER,
+    PORTUGUESE_TO_ENGLISH,
+)
 
 
 def render_sidebar_filters():
     """
     Hiển thị các bộ lọc tương tác trên Sidebar:
     - Khoảng thời gian (mặc định 2017-01-01 đến 2018-08-31)
-    - Bang / Khu vực
-    - Danh mục sản phẩm
+    - Bang / Khu vực (sắp theo số đơn giảm dần, nhãn Tên đầy đủ (Mã))
+    - Danh mục sản phẩm (sắp theo doanh thu giảm dần, nhãn Tiếng Việt)
     - Trạng thái đơn hàng
     Trả về dict filters chuẩn hóa (dùng tuple cho các danh sách để tương thích cache).
     """
@@ -59,24 +66,38 @@ def render_sidebar_filters():
 
     st.sidebar.divider()
 
-    # 2. Bộ lọc Bang / Khu vực
+    # 2. Bộ lọc Bang / Khu vực (sắp theo số đơn giảm dần, hiển thị qua state_label)
     st.sidebar.subheader("🗺️ Khu vực")
-    all_states = options.get("states", [])
+    all_states = list(options.get("states", []))
+    state_rank = {s: i for i, s in enumerate(STATE_ORDER)}
+    sorted_states = sorted(all_states, key=lambda s: state_rank.get(s, 999))
+
     selected_states = st.sidebar.multiselect(
         "Chọn Bang (State):",
-        options=all_states,
+        options=sorted_states,
         default=[],
+        format_func=state_label,
         placeholder="Tất cả các bang",
+        help="Lọc đơn hàng theo một hoặc nhiều bang của khách hàng (sắp theo số lượng đơn giảm dần).",
     )
 
-    # 3. Bộ lọc Danh mục sản phẩm
+    # 3. Bộ lọc Danh mục sản phẩm (sắp theo doanh thu giảm dần, hiển thị qua category_label)
     st.sidebar.subheader("📦 Sản phẩm")
-    all_categories = options.get("categories", [])
+    raw_categories = options.get("categories", [])
+    # Chuẩn hóa về mã tiếng Anh nếu DB trả về mã tiếng Bồ Đào Nha
+    all_categories = [PORTUGUESE_TO_ENGLISH.get(c, c) for c in raw_categories]
+    all_categories = list(dict.fromkeys(all_categories))
+
+    cat_rank = {c: i for i, c in enumerate(CATEGORY_ORDER)}
+    sorted_categories = sorted(all_categories, key=lambda c: cat_rank.get(c, 999))
+
     selected_categories = st.sidebar.multiselect(
         "Chọn Danh mục:",
-        options=all_categories,
+        options=sorted_categories,
         default=[],
+        format_func=category_label,
         placeholder="Tất cả danh mục",
+        help="Lọc đơn hàng theo một hoặc nhiều danh mục sản phẩm (sắp theo doanh thu giảm dần).",
     )
 
     # 4. Bộ lọc Trạng thái đơn hàng
