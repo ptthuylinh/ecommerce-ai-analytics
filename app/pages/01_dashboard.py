@@ -63,13 +63,12 @@ DONUT_COLORS = ["#1E88E5", "#00897B", "#FB8C00", "#D81B60", "#8E24AA"]
 
 
 def show_chart(fig):
-    """Hiển thị biểu đồ Plotly tương thích nền tối mặc định của Streamlit."""
+    """Hiển thị biểu đồ Plotly tương thích giao diện mặc định của Streamlit (System, Dark, Light)."""
     fig.update_layout(
-        template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
 
 # ==============================================================================
@@ -625,7 +624,7 @@ def render_delivery_tab(df_delay, df_reviews, df_states):
                     fig_state_delay.add_vline(
                         x=weighted_avg,
                         line_dash="dash",
-                        line_color="#E0E0E0",
+                        line_color="#757575",
                         annotation_text=f"Trung bình: {weighted_avg_str}",
                         annotation_position="top right",
                         annotation_font=dict(size=12, color="#FFFFFF"),
