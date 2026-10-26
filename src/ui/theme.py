@@ -82,9 +82,65 @@ html, body, p, label, input, textarea, li,
     font-feature-settings: 'liga';
 }}
 h1, h2, h3, h4, h5, h6 {{ font-family: 'Plus Jakarta Sans', sans-serif !important; font-weight: 700 !important; letter-spacing: -0.02em; color: {t['text']} !important; }}
-header[data-testid="stHeader"] {{ background: transparent !important; }}
-footer, #MainMenu, [data-testid="stToolbar"], [data-testid="stDeployButton"] {{ visibility: hidden !important; }}
-.block-container {{ padding-top: 1.25rem !important; padding-bottom: 2rem !important; max-width: 96% !important; }}
+header[data-testid="stHeader"] {{
+    background: transparent !important;
+    z-index: 999999 !important;
+    pointer-events: none !important;
+}}
+header[data-testid="stHeader"] button,
+header[data-testid="stHeader"] a,
+[data-testid="stToolbar"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapseButton"] {{
+    pointer-events: auto !important;
+}}
+[data-testid="stToolbar"] {{
+    visibility: visible !important;
+    display: flex !important;
+    background: transparent !important;
+}}
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {{
+    visibility: visible !important;
+    display: flex !important;
+    opacity: 1 !important;
+    color: #FFFFFF !important;
+}}
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="stSidebarCollapseButton"] button {{
+    background-color: {t['surface']} !important;
+    border: 1px solid {t['primary']} !important;
+    border-radius: 8px !important;
+    padding: 5px 8px !important;
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35) !important;
+    transition: all 0.2s ease !important;
+    color: #FFFFFF !important;
+}}
+[data-testid="stExpandSidebarButton"]:hover,
+[data-testid="stSidebarCollapsedControl"] button:hover,
+[data-testid="stSidebarCollapseButton"] button:hover {{
+    background-color: {t['primary']} !important;
+    border-color: {t['secondary']} !important;
+    color: #FFFFFF !important;
+    transform: scale(1.05) !important;
+}}
+[data-testid="stExpandSidebarButton"] svg,
+[data-testid="stExpandSidebarButton"] span,
+[data-testid="stSidebarCollapsedControl"] svg,
+[data-testid="stSidebarCollapsedControl"] span,
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarCollapseButton"] span {{
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+}}
+footer, #MainMenu, [data-testid="stDeployButton"] {{
+    visibility: hidden !important;
+    display: none !important;
+}}
+.block-container {{ padding-top: 2.5rem !important; padding-bottom: 2rem !important; max-width: 96% !important; }}
 div[data-testid="stVerticalBlockBorderWrapper"] {{ background-color: {t['surface']} !important; border: 1px solid {t['border']} !important; border-radius: 16px !important; box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45) !important; padding: 1.25rem !important; transition: border-color 0.2s ease, box-shadow 0.2s ease; }}
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {{ border-color: rgba(99, 102, 241, 0.4) !important; box-shadow: 0 6px 24px -2px rgba(0, 0, 0, 0.55) !important; }}
 .stTabs [data-baseweb="tab-list"] {{ gap: 8px; background-color: {t['bg']}; padding: 5px; border-radius: 14px; border: 1px solid {t['border']}; }}
