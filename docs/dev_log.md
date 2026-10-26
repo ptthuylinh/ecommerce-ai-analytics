@@ -6,12 +6,103 @@ Mục tiêu là phản ánh trung thực, khách quan diễn biến phát triể
 ---
 
 ## 📑 Mục lục
+- [2026-10-26: Cải thiện trải nghiệm người dùng, trực quan hóa biểu đồ và xuất báo cáo (UC04)](#2026-10-26-cải-thiện-trải-nghiệm-người-dùng-trực-quan-hóa-biểu-đồ-và-xuất-báo-cáo-uc04)
+  - [1. Cải thiện UX bộ lọc (Bang & Danh mục sản phẩm)](#1-cải-thiện-ux-bộ-lọc-bang--danh-mục-sản-phẩm)
+  - [2. Thống nhất màu biểu đồ và chỉnh sửa biểu đồ](#2-thống-nhất-màu-biểu-đồ-và-chỉnh-sửa-biểu-đồ)
+  - [3. Sửa thẻ KPI và chuẩn hóa Delta](#3-sửa-thẻ-kpi-và-chuẩn-hóa-delta)
+  - [4. Xuất báo cáo UC04 và trang chủ điều hướng](#4-xuất-báo-cáo-uc04-và-trang-chủ-điều-hướng)
+  - [5. Quan sát về triển khai và chiến lược nhánh](#5-quan-sát-về-triển-khai-và-chiến-lược-nhánh)
 - [2026-10-23: Tối ưu tốc độ dashboard (10 truy vấn JOIN -> bảng phẳng + pandas)](#2026-10-23-tối-ưu-tốc-độ-dashboard-10-truy-vấn-join---bảng-phẳng--pandas)
 - [2026-10-23: Thiết kế lại dashboard (v1 -> v2)](#2026-10-23-thiết-kế-lại-dashboard-v1---v2)
 - [[Ngày]: Viết lại truy vấn KPI (điền sau khi làm xong)](#ngày-viết-lại-truy-vấn-kpi-điền-sau-khi-làm-xong)
 - [2026-10-22: Thử tối ưu get_kpi_metrics bằng index](#2026-10-22-thử-tối-ưu-get_kpi_metrics-bằng-index)
 - [2026-10-22: Thiết lập CI và kiểm thử](#2026-10-22-thiết-lập-ci-và-kiểm-thử)
 - [💡 Bài học chung](#-bài-học-chung)
+
+---
+
+## 2026-10-26: Cải thiện trải nghiệm người dùng, trực quan hóa biểu đồ và xuất báo cáo (UC04)
+
+### 1. Cải thiện UX bộ lọc (Bang & Danh mục sản phẩm)
+- **Bối cảnh:** Bộ lọc trên sidebar cung cấp 2 chiều phân tích chính: Bang của khách hàng (`customer_state`) và Danh mục sản phẩm (`product_category_name_english`).
+- **Vấn đề:**
+  - Bang chỉ hiển thị mã 2 ký tự (SP, RJ, MG...), gây khó tiếp cận cho người dùng không am hiểu địa lý Brazil.
+  - Danh mục hiển thị tên gốc tiếng Anh hoặc slug tiếng Bồ Đào Nha (`bed_bath_table`, `agro_industry_and_commerce`...), chưa có bản địa hóa tiếng Việt.
+  - Nếu thay đổi trực tiếp giá trị option trong multiselect sang tiếng Việt sẽ phá vỡ logic lọc trong DB và DataFrame pandas (vốn khớp theo mã gốc).
+- **Quyết định:**
+  - Tách bạch giá trị dữ liệu bên dưới (mã gốc) khỏi nhãn hiển thị trực quan thông qua `format_func` của Streamlit multiselect và module mới `src/ui/labels.py`.
+  - Tạo từ điển `STATE_NAMES` (27 bang Brazil theo ISO 3166-2:BR) và hàm `state_label()` hiển thị dạng `"São Paulo (SP)"`.
+  - Tạo từ điển `CATEGORY_VI` dịch tự nhiên, chuẩn hóa toàn bộ danh mục sản phẩm từ CSDL. Đã dịch: **72 / 72 danh mục (100%)**, số danh mục còn fallback: **0**.
+  - Giá trị NULL / rỗng / nan chuẩn hóa hiển thị thành `"Chưa phân loại"`.
+  - Sắp xếp bang theo số lượng đơn hàng thực tế giảm dần (`STATE_ORDER`), danh mục theo doanh thu thực tế giảm dần (`CATEGORY_ORDER`), thêm placeholder và help tooltip.
+- **Thực hiện:** Tạo mới `src/ui/labels.py`, cập nhật `src/ui/filters.py` (chuẩn hóa mã qua `PORTUGUESE_TO_ENGLISH`), xuất nhãn qua `src/ui/__init__.py`.
+- **Kiểm chứng:** Bộ unit test `tests/test_labels.py` và integration test `test_all_db_categories_translated` kết nối trực tiếp `data/ecommerce.db`: xác nhận 72/72 danh mục DISTINCT trong DB đều có trong `CATEGORY_VI` và `category_label(x)` không chứa dấu gạch dưới (`_`).
+- **Đánh đổi:** Cần duy trì từ điển dịch khi DB xuất hiện thêm danh mục mới; giải quyết bằng cơ chế fallback `.replace("_", " ").title()`.
+- **Bài học:** Tách lớp trình bày khỏi dữ liệu giúp giao diện thân thiện với người dùng bản địa mà không làm ảnh hưởng tính ổn định của hệ thống truy vấn backend.
+
+### 2. Thống nhất màu biểu đồ và chỉnh sửa biểu đồ
+- **Bối cảnh:** Nhánh `main` (bản deploy live) sử dụng giao diện mặc định Streamlit Dark với bảng màu xanh dương (`#1E88E5`), đỏ (`#E53935`) và xanh ngọc (`#00897B`) được đánh giá cao về độ rõ ràng. Trong khi đó, nhánh `develop` trước đó đưa vào màu tím `#6366F1` và CSS can thiệp sâu, tạo sự bất nhất.
+- **Vấn đề:**
+  - Biểu đồ doanh thu hàng tháng: Đường MoM màu xanh ngọc trùng tông, trục MoM % bị lệch tâm; các tháng đầu (T9/2016..T1/2017) có doanh thu quá nhỏ (R$ 19 - 252) khiến MoM vọt lên +705.751%, bẹp dí toàn bộ biến động của các tháng thông thường; tồn tại 2 tiêu đề trùng lặp và legend đè nội dung.
+  - Biểu đồ tỷ lệ giao trễ theo bang: Chưa có mốc tham chiếu toàn sàn; phân nhóm 2 màu xanh/đỏ nhị phân cứng nhắc dễ gây hiểu lầm tiêu cực khi sự chênh lệch giữa các bang là nhỏ.
+- **Quyết định:**
+  - Đồng bộ diện mạo về giao diện mặc định Streamlit Dark (`base = "dark"` trong `.streamlit/config.toml`), bỏ CSS tùy biến thừa thãi.
+  - **Biểu đồ doanh thu & MoM:**
+    - Cột doanh thu giữ màu xanh `#1E88E5`, đường MoM chuyển sang màu đỏ `#E53935` (cả line và marker).
+    - Trục phải MoM đối xứng quanh 0: `range = [-m, m]` với $m = \max(|\text{MoM}|)$ làm tròn lên bội của 10 ($m = 120\%$), tick chia đều và thêm đường ngang đứt nét tại 0% bằng `add_hline` trên `yaxis2`.
+    - Bỏ điểm MoM của tháng đầu tiên và các tháng có doanh thu kỳ trước $< 5\%$ doanh thu tháng lớn nhất (loại bỏ méo mó nền thấp), kèm chú thích nhỏ: *"MoM bỏ qua các tháng đầu do nền doanh thu thấp"*.
+    - Đặt legend dưới đáy biểu đồ (`orientation="h", y=-0.25`), bỏ title trong figure, chỉ giữ một `st.subheader` sinh động sinh từ dữ liệu bằng f-string (nêu tháng đỉnh và tăng trưởng tổng giai đoạn).
+    - Trục x định dạng `"T1/2017"`, hover hiển thị dạng `"Tháng 1/2017: R$ 138.488"`.
+  - **Biểu đồ tỷ lệ trễ theo bang:**
+    - Giữ thang màu liên tục Reds (`[[0, "#FFCDD2"], [0.5, "#EF5350"], [1, "#B71C1C"]]`) vì trực quan hóa sắc thái mức độ trễ tốt hơn phân nhóm xanh/đỏ nhị phân.
+    - Thêm đường dọc đứt nét tại tỷ lệ trễ trung bình toàn sàn có trọng số theo số đơn ($\approx 6,6\%$, phản ánh sát thực tế so với trung bình cộng số học $8,8\%$) kèm annotation `"Trung bình: 6,6%"`.
+    - Tooltip hiển thị: Tên bang, Tỷ lệ trễ, Số đơn.
+    - Lọc bang có $\ge 500$ đơn để đảm bảo ý nghĩa thống kê; khi bộ lọc chỉ còn 1–2 bang, ẩn khung so sánh và hiện `st.info` tránh lỗi logic so sánh.
+    - Khung nhận định: Điểm đánh giá (4,30 sao vs 1,94 sao) sinh động từ DataFrame; chuyển khuyến nghị sang giọng gợi ý (*"Có thể cân nhắc..."*) và nêu rõ dữ liệu chưa xác định nguyên nhân trễ.
+- **Thực hiện:** Cập nhật `.streamlit/config.toml` và hàm `render_monthly_revenue_chart`, `render_delivery_tab` trong `app/pages/01_dashboard.py`.
+- **Kiểm chứng:** Kiểm tra trực quan trên trình duyệt và tự động hóa qua pytest (49/49 non-integration, 34/34 integration pass).
+- **Đánh đổi:** Chuỗi đường MoM bắt đầu hiển thị từ T2/2017 nhưng đổi lại biểu đồ không bị kéo giãn cực đoan bởi các điểm dị biệt ban đầu.
+- **Bài học:** Biểu đồ kết hợp hai trục cần xử lý ngoại lai của chuỗi % và căn đối xứng trục 0 để bảo đảm tính trung thực của trực quan hóa dữ liệu.
+
+### 3. Sửa thẻ KPI và chuẩn hóa Delta
+- **Bối cảnh:** 6 thẻ `st.metric` ở Tab 1 theo dõi Doanh thu, Đơn hàng, Khách hàng, AOV, Đánh giá TB và Tỷ lệ giao đúng hạn.
+- **Vấn đề:**
+  - Giá trị doanh thu $\ge 1$ triệu bị tràn khung thẻ metric trên giao diện.
+  - Chỉ số so sánh Delta với kỳ liền trước bị âm bất thường khi lọc toàn bộ giai đoạn mặc định (2017-01-01 .. 2018-08-31), do chu kỳ đối ứng cùng độ dài rơi vào 2015–2016 (ngoài phạm vi hoạt động chính của Olist).
+  - Màu sắc và hướng mũi tên delta bị ngược ở một số chỉ số.
+- **Quyết định:**
+  - Định dạng số tiền $\ge 1$ triệu dạng rút gọn tiếng Việt `"R$ 15,4 triệu"`, hiển thị số đầy đủ trong tooltip `help`. Điểm đánh giá hiển thị `"4,16"` kèm nhãn `"Đánh giá TB (/5)"`. Bố cục 2 hàng $\times$ 3 cột cân đối.
+  - Tạo hàm `check_prev_period_valid`: Delta chỉ hiển thị khi kỳ trước nằm trọn trong khoảng dữ liệu ($\ge 2017\text{-}01\text{-}01$) và có $\ge 100$ đơn hàng; ngược lại hiển thị `"—”` kèm help `"Chưa có kỳ trước để so sánh"`.
+  - Delta doanh thu/đơn/khách/AOV theo `%`; đánh giá theo điểm tuyệt đối; đúng hạn theo điểm phần trăm; màu và mũi tên theo đúng dấu dương xanh / âm đỏ (`delta_color="normal"`).
+- **Thực hiện:** Cấu hình các hàm định dạng trong `src/ui/labels.py` và tích hợp vào `render_kpi_cards` trong `app/pages/01_dashboard.py`.
+- **Kiểm chứng:** 9 unit tests cho định dạng giá trị, delta và điều kiện hợp lệ kỳ trước trong `tests/test_labels.py` đều PASSED.
+- **Đánh đổi:** Không hiển thị số delta khi chọn mốc 20 tháng mặc định, nhưng loại bỏ hoàn toàn các con số so sánh gây hiểu nhầm.
+- **Bài học:** Không đưa ra dữ liệu so sánh khi kỳ đối ứng không đủ điều kiện tin cậy thống kê; hiển thị trạng thái thiếu dữ liệu rõ ràng tốt hơn hiển thị số liệu sai ngữ cảnh.
+
+### 4. Xuất báo cáo UC04 và trang chủ điều hướng
+- **Bối cảnh:** Phân hệ UC04 cho phép trích xuất dữ liệu chi tiết của các đơn hàng và chỉ số KPI theo bộ lọc hiện tại ra file ngoại tuyến (CSV/Excel).
+- **Vấn đề:**
+  - Khi dữ liệu lớn ($> 50.000$ dòng), xuất toàn bộ có thể gây tràn RAM trình duyệt; phiên bản trước có nguy cơ ẩn nút hoặc gặp lỗi khi vượt ngưỡng.
+  - Thiếu trang chủ tổng quan định hướng toàn hệ sinh thái (BI Dashboard, RFM, AI Assistant).
+- **Quyết định:**
+  - Thêm khu vực xuất báo cáo `render_export_section` ở cuối dashboard: hỗ trợ xuất CSV (`utf-8-sig`) và Excel (`.xlsx` 2 sheet `KPI` và `Don hang`).
+  - Đặt giới hạn `MAX_EXPORT_ROWS = 50_000`: khi vượt ngưỡng, hiển thị `st.warning` thông báo và tự động cắt 50.000 dòng đầu, đảm bảo nút tải luôn hiển thị và hoạt động thông suốt.
+  - Tên file xuất kèm timestamp: `ecommerce_report_YYYYMMDD_HHMMSS`.
+  - Bổ sung `openpyxl>=3.1.0` vào `requirements.txt`.
+  - Viết mới `app/main.py`: Trang chủ giới thiệu nền tảng E-Commerce AI Analytics, hiển thị 4 KPI quy mô toàn sàn (99.441 đơn, 96.096 khách hàng, R$ 16,0 triệu doanh thu), giới thiệu 3 phân hệ và nút điều hướng chuyển sang `01_dashboard.py`.
+- **Thực hiện:** Cập nhật `app/pages/01_dashboard.py`, viết `app/main.py`, cập nhật `requirements.txt`.
+- **Kiểm chứng:** Thử nghiệm xuất file thực tế trên trình duyệt; tải thành công cả CSV và Excel đa sheet; khi vượt 50.000 dòng, cảnh báo hiển thị đúng và dữ liệu được cắt an toàn.
+- **Đánh đổi:** Tệp Excel bị giới hạn 50.000 dòng đầu tiên thay vì toàn bộ dữ liệu để bảo vệ bộ nhớ máy chủ.
+- **Bài học:** Nguyên tắc thiết kế suy giảm có kiểm soát (Graceful Degradation): khi gặp giới hạn tài nguyên, ưu tiên trả về tập dữ liệu tối đa an toàn kèm thông báo thay vì để phát sinh lỗi ngắt quãng trải nghiệm.
+
+### 5. Quan sát về triển khai và chiến lược nhánh
+- **Bối cảnh:** Đối soát giữa môi trường phát triển cục bộ và bản ứng dụng đã triển khai trực tiếp trên Streamlit Cloud.
+- **Vấn đề:** Ứng dụng deploy trên Streamlit Cloud đang cấu hình theo dõi nhánh `main`. Do đó, diện mạo live mang phong cách Streamlit Dark cổ điển, trong khi nhánh `develop` trước đó có các can thiệp CSS khác biệt.
+- **Quyết định:**
+  - Đồng bộ toàn bộ diện mạo của nhánh làm việc (`feature/classic-ui`) về đúng tiêu chuẩn giao diện của bản deploy trên `main` (nền tối mặc định Streamlit, bảng màu gốc, không inject CSS phức tạp), trong khi giữ nguyên toàn bộ logic in-memory pandas mới và tính năng xuất báo cáo.
+  - Chưa merge vào `main` vì: đang hoàn thiện kiểm thử toàn diện (unit test, integration test, visual test), chuẩn hóa nhãn tiếng Việt và cần nghiệm thu trước khi mở Pull Request chính thức.
+- **Thực hiện & Kiểm chứng:** Ứng dụng chạy mượt mà, sidebar điều hướng hoạt động hoàn hảo, kiểm thử 100% xanh.
+- **Bài học:** Việc phân tách rõ ràng giữa nhánh tính năng và nhánh triển khai giúp đảm bảo tính an toàn cho hệ thống live trong khi vẫn duy trì tốc độ phát triển các tính năng mới.
 
 ---
 
@@ -106,3 +197,6 @@ Mục tiêu là phản ánh trung thực, khách quan diễn biến phát triể
 * **Đo lường trước khi tối ưu:** Luôn thực hiện đo đạc định lượng với số liệu thực tế trước và sau khi thay đổi; không giả định rằng việc thêm index luôn luôn làm tăng tốc truy vấn.
 * **Kiểm tra tính đúng đắn của số liệu:** Tối ưu hóa hiệu năng phải đi kèm với việc đối soát ngữ nghĩa nghiệp vụ của dữ liệu (như việc phân biệt giữa `customer_id` và `customer_unique_id`).
 * **Tránh rủi ro nhân dòng (fan-out) khi JOIN:** Khi một thực thể có quan hệ 1-N với nhiều bảng độc lập (như payments và reviews), JOIN trực tiếp sẽ nhân số dòng theo tích Đề-các, gây chậm đột biến do `COUNT(DISTINCT)` và làm sai lệch hàm tổng hợp `SUM`. Ưu tiên sử dụng CTE hoặc sub-queries để tổng hợp trước.
+* **Tách biệt dữ liệu lõi và lớp hiển thị:** Giữ nguyên mã gốc trong cơ sở dữ liệu làm khóa định danh duy nhất cho các phép tính toán và chỉ định dạng, dịch thuật ở tầng trình bày giao diện (Presentation Layer) để nâng cao trải nghiệm người dùng mà không tạo rủi ro sai lệch dữ liệu.
+* **Kiểm soát trực quan hóa dữ liệu hai trục (Dual-axis):** Khi biểu diễn đồng thời chuỗi giá trị tuyệt đối và chuỗi tỷ lệ phần trăm (%), cần kiểm soát các mốc dữ liệu nền cực thấp để tránh méo mó tỷ lệ, đồng thời căn chỉnh đối xứng trục gốc để đảm bảo tính trung thực thị giác.
+* **Thiết kế suy giảm có kiểm soát (Graceful Degradation):** Khi dữ liệu vượt ngưỡng tải an toàn hoặc thiếu dữ liệu đối chiếu kỳ trước, ưu tiên hiển thị cảnh báo hướng dẫn và trạng thái trung tính thay vì làm gián đoạn luồng sử dụng hoặc phát sinh lỗi ngoại lệ.
