@@ -230,3 +230,6 @@ models/*.pkl
 # Bỏ qua mã khóa bảo mật (API Key)
 .env
 .streamlit/secrets.toml
+
+# Bỏ qua nhật ký AI Agent
+data/audit_log.db

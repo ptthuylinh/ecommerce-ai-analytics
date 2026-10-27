@@ -121,8 +121,10 @@ BUSINESS_RULES: List[str] = [
     "GIAO HÀNG TRỄ HẠN: Một đơn hàng được xem là giao trễ hạn khi ngày khách nhận thực tế lớn hơn ngày dự kiến: `date(o.order_delivered_customer_date) > date(o.order_estimated_delivery_date)`.",
     "TÊN DANH MỤC SẢN PHẨM: Luôn sử dụng cột `product_category_name_english` trong bảng `products` để lọc và hiển thị danh mục sản phẩm (ví dụ: 'bed_bath_table', 'health_beauty', 'sports_leisure').",
     "ĐƠN VỊ TIỀN TỆ: Mọi giá trị tiền tệ trong CSDL được tính bằng đồng Real Brazil (BRL, R$). Làm tròn số tiền 2 chữ số thập phân bằng `ROUND(..., 2)`.",
+    "KHOẢNG THỜI GIAN MẶC ĐỊNH: Nếu câu hỏi của người dùng không nêu rõ mốc thời gian cụ thể, mặc định áp dụng khoảng thời gian dữ liệu đầy đủ từ 2017-01-01 đến 2018-08-31 (`o.order_purchase_timestamp >= '2017-01-01 00:00:00' AND o.order_purchase_timestamp <= '2018-08-31 23:59:59'`) và phải nêu rõ khoảng thời gian mặc định này trong câu trả lời.",
     "BẢO MẬT SQL GUARD: Chỉ tạo ĐÚNG 1 câu lệnh bắt đầu bằng `SELECT` hoặc `WITH ... SELECT`. Không viết comment (-- hoặc /* */). Không dùng dấu chấm phẩy ở giữa câu lệnh. Không sử dụng từ khóa thay đổi dữ liệu (DROP, DELETE, UPDATE, INSERT, ALTER, CREATE, v.v.). Chỉ sử dụng 6 bảng trong whitelist (orders, order_items, order_payments, products, customers, order_reviews).",
 ]
+
 
 # ==============================================================================
 # 3. DANH SÁCH FEW-SHOT EXAMPLES (CÂU HỎI TIẾNG VIỆT -> SQL CHUẨN)
