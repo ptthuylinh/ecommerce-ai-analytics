@@ -231,5 +231,10 @@ models/*.pkl
 .env
 .streamlit/secrets.toml
 
-# Bỏ qua nhật ký AI Agent
-data/audit_log.db
+# Bỏ qua nhật ký & cache AI Agent
+data/audit_log.db
+data/agent_cache.db
+
+# Bỏ qua kết quả benchmark cục bộ
+tests/eval_results.json
+

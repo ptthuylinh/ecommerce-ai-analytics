@@ -37,6 +37,14 @@ class MockLLMResponse:
         self.text = text
 
 
+@pytest.fixture(autouse=True)
+def isolate_agent_cache(tmp_path, monkeypatch):
+    """Cô lập cache SQLite cho từng test case để không phụ thuộc data/agent_cache.db."""
+    test_cache = str(tmp_path / "isolated_agent_cache.db")
+    monkeypatch.setattr("src.ai.cache.DEFAULT_CACHE_DB_PATH", test_cache)
+    monkeypatch.setattr("src.ai.agent.DEFAULT_CACHE_DB_PATH", test_cache)
+
+
 # ==============================================================================
 # 1. UNIT TESTS: OUT-OF-SCOPE & PARSING
 # ==============================================================================
@@ -178,13 +186,13 @@ def test_ask_llm_reports_out_of_scope_keyword(tmp_path):
 
 
 def test_ask_valid_sql_executes_and_interprets_successfully(tmp_path):
-    """LLM sinh SQL hợp lệ, execute_safe chạy thành công và trả lời kèm chart_spec."""
+    """LLM sinh SQL hợp lệ, execute_safe chạy thành công và diễn giải phức tạp (> 2 cột) qua LLM kèm chart_spec."""
     audit_db = str(tmp_path / "test_audit.db")
     mock_client = MagicMock()
 
     valid_sql = (
-        "SELECT customer_state, COUNT(DISTINCT customer_id) AS total_customers "
-        "FROM customers GROUP BY customer_state ORDER BY total_customers DESC LIMIT 5;"
+        "SELECT customer_city, customer_state, COUNT(DISTINCT customer_id) AS total_customers "
+        "FROM customers GROUP BY customer_city, customer_state ORDER BY total_customers DESC LIMIT 5;"
     )
     interpret_text = (
         "[CHART_SPEC]\n"
@@ -195,11 +203,11 @@ def test_ask_valid_sql_executes_and_interprets_successfully(tmp_path):
 
     mock_client.models.generate_content.side_effect = [
         MockLLMResponse(f"```sql\n{valid_sql}\n```"),  # Bước 1: Sinh SQL
-        MockLLMResponse(interpret_text),                # Bước 2: Diễn giải
+        MockLLMResponse(interpret_text),                # Bước 2: Diễn giải (gọi LLM vì > 2 cột)
     ]
 
     res = ask(
-        question="Top 5 bang có nhiều khách hàng nhất?",
+        question="Top 5 thành phố và bang có nhiều khách hàng nhất?",
         client=mock_client,
         audit_db_path=audit_db,
     )
@@ -214,13 +222,39 @@ def test_ask_valid_sql_executes_and_interprets_successfully(tmp_path):
     assert res["latency_s"] >= 0
 
 
+def test_ask_simple_result_uses_template_interpret_and_avoids_llm_step2(tmp_path):
+    """Khi kết quả <= 2 cột, ask() dùng template_interpret và không gọi LLM lần 2."""
+    audit_db = str(tmp_path / "test_audit.db")
+    mock_client = MagicMock()
+    valid_sql = (
+        "SELECT customer_state, COUNT(DISTINCT customer_id) AS total_customers "
+        "FROM customers GROUP BY customer_state ORDER BY total_customers DESC LIMIT 3;"
+    )
+
+    mock_client.models.generate_content.side_effect = [
+        MockLLMResponse(f"```sql\n{valid_sql}\n```"),  # Chỉ cần 1 mock vì bước 2 dùng template
+    ]
+
+    res = ask(
+        question="Số khách hàng theo bang",
+        client=mock_client,
+        audit_db_path=audit_db,
+    )
+
+    assert res["error"] is None
+    assert res["sql"] == valid_sql
+    assert res["llm_calls"] == 1  # Chỉ 1 lần gọi LLM sinh SQL
+    assert "Tìm thấy **3 bản ghi**" in res["answer"]
+    assert mock_client.models.generate_content.call_count == 1
+
+
 def test_ask_blocked_sql_is_rejected_and_retries_successfully(tmp_path):
-    """Lần 1 sinh SQL cấm (DROP/bảng ngoài whitelist) bị chặn -> Thử lại lần 2 sinh SQL hợp lệ."""
+    """Lần 1 sinh SQL cấm (DROP/bảng ngoài whitelist) bị chặn -> Thử lại lần 2 sinh SQL hợp lệ (>2 cột gọi diễn giải)."""
     audit_db = str(tmp_path / "test_audit.db")
     mock_client = MagicMock()
 
     bad_sql = "SELECT * FROM users;"  # Bảng ngoài whitelist
-    good_sql = "SELECT order_id, order_status FROM orders LIMIT 3;"
+    good_sql = "SELECT order_id, customer_id, order_status FROM orders LIMIT 3;"
     interpret_text = (
         "[CHART_SPEC]\nnull\n[ANSWER]\n"
         "Đã tìm thấy 3 đơn hàng hợp lệ trong hệ thống."
@@ -229,7 +263,7 @@ def test_ask_blocked_sql_is_rejected_and_retries_successfully(tmp_path):
     mock_client.models.generate_content.side_effect = [
         MockLLMResponse(bad_sql),        # Lần thử 1 (fail)
         MockLLMResponse(good_sql),       # Lần thử 2 (sửa thành công)
-        MockLLMResponse(interpret_text), # Diễn giải
+        MockLLMResponse(interpret_text), # Diễn giải (gọi LLM vì > 2 cột)
     ]
 
     res = ask(
@@ -358,6 +392,126 @@ def test_ask_automatically_persists_audit_log(tmp_path):
     assert rows[0][0] == "Thử nghiệm audit"
     assert rows[0][1] == "success"
     assert rows[0][2] == 1
+
+
+# ==============================================================================
+# 4. UNIT TESTS: CACHE, SAMPLE QUESTIONS, QUOTA & TEMPLATE INTERPRETATION
+# ==============================================================================
+
+def test_cache_hit_does_not_call_llm(tmp_path):
+    """Khi Cache Hit, SQL được lấy từ cache và chạy lại, hoàn toàn không gọi LLM."""
+    cache_db = str(tmp_path / "test_cache.db")
+    audit_db = str(tmp_path / "test_audit.db")
+
+    from src.ai.cache import set_cached_sql
+
+    question = "Top 5 sản phẩm bán chạy nhất"
+    sql = "SELECT product_id FROM products LIMIT 5;"
+    set_cached_sql(question, sql, db_path=cache_db)
+
+    mock_client = MagicMock()
+
+    res = ask(
+        question=question,
+        client=mock_client,
+        cache_db_path=cache_db,
+        audit_db_path=audit_db,
+    )
+
+    assert res["cached"] is True
+    assert res["sql"] == sql
+    assert res["df"] is not None
+    assert len(res["df"]) == 5
+    assert res["llm_calls"] == 0
+    # Đảm bảo LLM hoàn toàn không bị gọi
+    mock_client.models.generate_content.assert_not_called()
+
+
+def test_ask_sample_executes_directly_without_llm(tmp_path):
+    """ask_sample(index) chạy trực tiếp câu SQL đã kiểm chứng, 0 lượt gọi LLM."""
+    audit_db = str(tmp_path / "test_sample_audit.db")
+
+    from src.ai.agent import ask_sample, SAMPLE_QUESTIONS
+
+    assert len(SAMPLE_QUESTIONS) >= 10
+    res = ask_sample(0, audit_db_path=audit_db)
+
+    assert res["from_sample"] is True
+    assert res["error"] is None
+    assert res["sql"] is not None
+    assert res["df"] is not None
+    assert len(res["df"]) > 0
+    assert res["llm_calls"] == 0
+    assert res["attempts"] == 0
+
+
+def test_ask_sample_invalid_index():
+    """ask_sample với chỉ số vượt quá phạm vi trả về thông báo lỗi thân thiện."""
+    from src.ai.agent import ask_sample
+
+    res = ask_sample(999)
+    assert res["error"] == "INVALID_SAMPLE_INDEX"
+    assert res["sql"] is None
+
+
+def test_daily_llm_limit_exhausted_returns_quota_exhausted(tmp_path):
+    """Khi hạn mức lượt gọi trong ngày đạt giới hạn, trả về QUOTA_EXHAUSTED mà không gọi LLM."""
+    audit_db = str(tmp_path / "exhausted_audit.db")
+    mock_client = MagicMock()
+
+    with patch("src.ai.agent.get_quota_status", return_value={"used": 18, "limit": 18, "remaining": 0, "is_exhausted": True}):
+        res = ask(
+            question="Tổng doanh thu năm 2017",
+            client=mock_client,
+            audit_db_path=audit_db,
+            use_cache=False,
+        )
+
+    assert res["error"] == "QUOTA_EXHAUSTED"
+    assert res["sql"] is None
+    assert res["df"] is None
+    assert "Đã đạt hạn mức truy vấn AI trong ngày" in res["answer"]
+    mock_client.models.generate_content.assert_not_called()
+
+
+def test_429_error_handled_returns_quota_exhausted_no_crash(tmp_path):
+    """Khi LLM ném lỗi 429 RESOURCE_EXHAUSTED, hệ thống bắt lại và trả về QUOTA_EXHAUSTED không crash."""
+    audit_db = str(tmp_path / "rate_limit_audit.db")
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = Exception("429 RESOURCE_EXHAUSTED: quota exceeded on free tier")
+
+    res = ask(
+        question="Số lượng khách hàng tại São Paulo",
+        client=mock_client,
+        audit_db_path=audit_db,
+        use_cache=False,
+    )
+
+    assert res["error"] == "QUOTA_EXHAUSTED"
+    assert "Đã đạt hạn mức truy vấn AI trong ngày" in res["answer"]
+    assert res["sql"] is None
+
+
+def test_template_interpret_formats_numbers_correctly():
+    """Hàm template_interpret định dạng số liệu chính xác từ DataFrame."""
+    from src.ai.agent import template_interpret
+
+    # Test 1 dòng, 1 cột
+    df_single = pd.DataFrame({"total_revenue": [15422461.77]})
+    spec_1, ans_1 = template_interpret("Tổng doanh thu là bao nhiêu?", df_single)
+    assert spec_1 is None
+    assert "15,422,461.77" in ans_1
+
+    # Test 2 cột (suy luận chart_spec dạng bar)
+    df_two_cols = pd.DataFrame({
+        "customer_state": ["SP", "RJ", "MG"],
+        "orders": [40000, 12000, 11000]
+    })
+    spec_2, ans_2 = template_interpret("Đơn hàng theo bang", df_two_cols)
+    assert spec_2 == {"type": "bar", "x": "customer_state", "y": "orders"}
+    assert "SP" in ans_2
+    assert "40,000" in ans_2
+
 
 
 # ==============================================================================
