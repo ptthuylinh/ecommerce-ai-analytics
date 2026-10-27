@@ -26,6 +26,7 @@ ALLOWED_TABLES: Set[str] = {
     "customers",
     "order_reviews",
 }
+WHITELIST_TABLES = ALLOWED_TABLES
 
 # Danh sách từ khóa DDL / DML / Quản trị bị cấm hoàn toàn
 BLOCKED_KEYWORDS: Set[str] = {
